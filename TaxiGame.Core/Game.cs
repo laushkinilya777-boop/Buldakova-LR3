@@ -13,21 +13,72 @@ namespace TaxiGame.Core
     /// </summary>
     public class Game
     {
-        /// <summary>Игровое поле.</summary>
-        public Board Board { get; set; }
+        private Board board = new Board();                   // игровое поле
+        private List<Player> players = new List<Player>();   // игроки
+        private int currentIndex;                            // номер игрока, который сейчас ходит
+        private string winner;                               // имя победителя (null, пока игра идёт)
+        private IDice dice = new RandomDice();               // кубик
 
-        /// <summary>Игроки.</summary>
-        public List<Player> Players { get; set; } = new List<Player>();
+        /// <summary>Игровое поле. Не может быть null.</summary>
+        public Board Board
+        {
+            get { return board; }
+            set
+            {
+                if (value == null)
+                    throw new ArgumentException("Игровое поле не может быть null.");
+                board = value;
+            }
+        }
 
-        /// <summary>Номер игрока, который сейчас ходит.</summary>
-        public int CurrentIndex { get; set; }
+        /// <summary>Игроки. Список не может быть null.</summary>
+        public List<Player> Players
+        {
+            get { return players; }
+            set
+            {
+                if (value == null)
+                    throw new ArgumentException("Список игроков не может быть null.");
+                players = value;
+            }
+        }
 
-        /// <summary>Имя победителя (null, пока игра идёт).</summary>
-        public string Winner { get; set; }
+        /// <summary>Номер игрока, который сейчас ходит: от 0 до Players.Count - 1.</summary>
+        public int CurrentIndex
+        {
+            get { return currentIndex; }
+            set
+            {
+                if (value < 0 || (players.Count > 0 && value >= players.Count))
+                    throw new ArgumentException("Нет игрока с таким номером.");
+                currentIndex = value;
+            }
+        }
 
-        /// <summary>Кубик (в файл не сохраняется).</summary>
+        /// <summary>Имя победителя (null, пока игра идёт). Пустая строка не допускается.</summary>
+        public string Winner
+        {
+            get { return winner; }
+            set
+            {
+                if (value != null && value.Trim() == "")
+                    throw new ArgumentException("Имя победителя не может быть пустым.");
+                winner = value;
+            }
+        }
+
+        /// <summary>Кубик (в файл не сохраняется). Не может быть null.</summary>
         [JsonIgnore]
-        public IDice Dice { get; set; } = new RandomDice();
+        public IDice Dice
+        {
+            get { return dice; }
+            set
+            {
+                if (value == null)
+                    throw new ArgumentException("Кубик не может быть null.");
+                dice = value;
+            }
+        }
 
         /// <summary>Закончена ли игра.</summary>
         [JsonIgnore]
@@ -37,13 +88,14 @@ namespace TaxiGame.Core
         [JsonIgnore]
         public Player CurrentPlayer => Players[CurrentIndex];
 
-        /// <summary>Пустой конструктор — нужен для загрузки из JSON.</summary>
+        /// <summary>Конструктор без параметров — нужен для загрузки из JSON.</summary>
         public Game() { }
 
         /// <summary>Новая игра на стандартном поле.</summary>
+        /// <param name="names">Имена игроков (от 1 до 4).</param>
         public Game(List<string> names)
         {
-            if (names.Count < 1 || names.Count > 4)
+            if (names == null || names.Count < 1 || names.Count > 4)
                 throw new ArgumentException("Игроков должно быть от 1 до 4.");
             Board = Board.CreateStandard();
             foreach (string name in names)
@@ -51,8 +103,9 @@ namespace TaxiGame.Core
         }
 
         /// <summary>
-        /// Ход текущего игрока. Возвращает текст: что произошло.
+        /// Делает ход текущего игрока.
         /// </summary>
+        /// <returns>Текст с описанием хода.</returns>
         public string MakeTurn()
         {
             if (IsOver) throw new InvalidOperationException("Игра окончена.");
@@ -67,10 +120,10 @@ namespace TaxiGame.Core
             }
             else
             {
-                int dice = Dice.Roll();
-                player.Position = Math.Min(player.Position + dice, Board.Finish);
+                int points = Dice.Roll();
+                player.Position = Math.Min(player.Position + points, Board.Finish);
                 Cell cell = Board.Cells[player.Position];
-                message = $"{player.Name}: выпало {dice}, клетка {player.Position} «{cell.Name}».";
+                message = $"{player.Name}: выпало {points}, клетка {player.Position} «{cell.Name}».";
 
                 // действие клетки
                 if (cell.Steps != 0)
@@ -84,7 +137,7 @@ namespace TaxiGame.Core
                 if (player.Position == Board.Finish)
                 {
                     Winner = player.Name;
-                    return message + $" {player.Name} доехал до финиша и победил!";
+                    return message + $" Финиш! Победитель — {player.Name}!";
                 }
             }
 
@@ -97,7 +150,10 @@ namespace TaxiGame.Core
     /// <summary>Сохранение и загрузка игры.</summary>
     public interface IGameStorage
     {
+        /// <summary>Сохраняет игру в файл.</summary>
         void Save(Game game, string path);
+
+        /// <summary>Загружает игру из файла.</summary>
         Game Load(string path);
     }
 
@@ -106,6 +162,7 @@ namespace TaxiGame.Core
     {
         public void Save(Game game, string path)
         {
+            if (game == null) throw new ArgumentNullException(nameof(game));
             File.WriteAllText(path, JsonSerializer.Serialize(game));
         }
 

@@ -12,7 +12,16 @@ namespace TaxiGame.Core
     /// <summary>Обычный случайный кубик.</summary>
     public class RandomDice : IDice
     {
-        private readonly Random random = new Random();
+        private readonly Random random;   // генератор случайных чисел
+
+        /// <summary>Создаёт кубик со своим генератором случайных чисел.</summary>
+        public RandomDice()
+        {
+            random = new Random();
+        }
+
+        /// <summary>Бросает кубик.</summary>
+        /// <returns>Случайное число от 1 до 6.</returns>
 
         public int Roll() => random.Next(1, 7);
     }
